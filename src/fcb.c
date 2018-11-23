@@ -4,19 +4,12 @@
 #include "string.h"
 #include "math.h"
 
-#define next_id(block,size) (*((uint32_t*)(((uint8_t*)block)+size-4)))
-#define set_next_id(block,size,id) \
-        (*((uint32_t*)(((uint8_t*)block)+size-4)))=id
-
 struct visit_arg {
-        //uint32_t begin;
-        //uint32_t end;
         uint32_t now;
         uint32_t now_block_id;
         struct fcb *f;
         void *other_arg;
 };
-
 
 static bool visit_blocks(uint32_t root, uint32_t max_degree, 
                 uint32_t begin, uint32_t count, visit_arg *args,
@@ -36,14 +29,13 @@ static bool visit_blocks(uint32_t root, uint32_t max_degree,
         if (!buffer)
                 return false;
         now_step = pow(step, max_degree - 1) * last_step;
-        while (max_degree--) {
+        while (true) {
                 error = !read_fsb(buffer, root);
                 if (error)
                         return false;
-                if (!max_degree) {
-                        now_step = 1;
-                } else {
-                        now_step /= last_step;
+                now_step /= last_step;
+                if (!(--max_degree)) {
+                        break;
                 }
                 offset = begin / now_step;
                 root = *(((uint32_t*)buffer) + offset);
@@ -70,6 +62,7 @@ static bool visit_blocks(uint32_t root, uint32_t max_degree,
                 root = *(((uint32_t*)buffer) + last_step); // get next index block id
                 read_fsb(buffer, root);
         }
+        free(buffer);
         return true;
 }
 
@@ -187,224 +180,92 @@ static bool visit_file_blocks(uint32_t begin, uint32_t count, void* args,
                 return false;
         bc = f->block_size / 4;
         m[0] = MAX_DIRECT_LEN;
-        m[1] = bc;
-        m[2] = bc * bc;
+        m[1] = bc - 1;
+        m[2] = m[1] * bc;
         max = m[0] + m[1] + m[2];
         if (begin >= max || begin + count < begin || begin + count >= max)
                 return false;
-        ///////////////////////////
-        //  ssdsafadfadsfasdfsdanfandnfandf
-        ///////////
-        //
         for (i = 0; i < 3; ++i) {
                 if (begin + count <= m[i]) {
                         visit_index(i, begin, count, args, visit, f);
                         break;
                 } else {
                         visit_index(i, begin, m[i], args, visit, f);
-                        begin += m[i];
+                        begin = 0;
                         count -= m[i];
                 }
         }
 }
 
-//static bool get_block_id(uint32_t *block_id, uint32_t n, struct fcb *f)
-//{
-//        uint8_t *buffer = NULL;
-//        uint32_t index_size;
-//        uint32_t next;
-//        uint32_t step_size;
-//        uint32_t offset;
-//        if (!f)
-//                return false;
-//        index_size = f->block_size / 4;
-//        if (n < MAX_DIRECT_LEN) {                   // direct
-//                *block_id = f->direct[n];
-//        } else {
-//                buffer = (uint8_t*)malloc(sizeof(uint8_t) * block_size);
-//                if (!buffer)
-//                        return false;
-//                n = n - MAX_DIRECT_LEN;
-//                if (n < index_size) {               // single_indirect
-//                        next = f->single_indirect;
-//                        step_size = 1;
-//                }
-//                n = n - index_size;
-//                if (n < index_size * index_size) {  // double_indirect
-//                        next = f->double_indirect;
-//                        step_size = index_size;
-//                } else {
-//                        return false;
-//                }
-//                while (degree--) {
-//                        read_fsb(buffer, next);
-//                        offset = n / step_size;
-//                        next = *(((uint32_t*)buffer) + offset);
-//                        n = n - offset * step_size;
-//                        step_size = step_size / index_size;
-//                }
-//                *block_id = next;
-//                if (buffer)
-//                        free(buffer);
-//        }
-//        return true;
-//}
+//struct visit_arg {
+//        uint32_t now;
+//        uint32_t now_block_id;
+//        struct fcb *f;
+//        void *other_arg;
+//};
+//static bool visit_file_blocks(uint32_t begin, uint32_t count, void* args,
+//                bool (*visit)(struct visit_arg *),
+//                struct fcb *f)
+struct rw_arg {
+        //uint32_t begin;  // the first block
+        //uint32_t end;    // the last block
+        uint32_t count;  // remaining bytes
+        uint32_t offset;
+        uint8_t *ptr;
+}
 
-//static bool visit_blocks(uint32_t first_block, uint32_t count, struct fcb* f, bool (*visit)(uint32_t, struct fcb*)) {
-//        uint32_t first_block, last_block, i, bs, block_id;
-//        uint8_t* buffer;
-//        bs = f->block_size;
-//        first_block = addr / (bs - 4); 
-//        last_block = (addr + size - 1) / (bs - 4);
-//        for (i = first_block; i <= last_block; ++i) {
-//                error = !get_block_id(&block_id, i, f);
-//                if (error) {
-//                        return false;
-//                }
-//                if (i != last_block) {
-//                        error = !visit(addr, size, f, block_id, false);
-//                } else {
-//                        error = !visit(addr, size, f, block_id, true);
-//                }
-//                if (error) {
-//                        return false;
-//                }
-//        }
-//}
-//
-//static bool visit_for_read(uint32_t addr, uint32_t size, struct fcb* f, uint32_t block_id, bool more_block)
-//{
-//        if (i == first_block || i == last_block) {
-//                error = !get_block_id(&block_id, i, f);
-//                if (error) {
-//                        return false;
-//                }
-//                read_fsb(buffer, block_id);
-//                if (i == first_block) {
-//                        cpy_size = bs - addr % bs;
-//                        to = ptr;
-//                        from = buffer + bs - cpy_size;
-//                } else {
-//                        cpy_size = (addr + size) % bs;
-//                        to = ptr + size - cpy_size;
-//                        from = buffer;
-//                }
-//                memcpy(to, from, cpy_size);
-//        } else {
-//                error = !get_block_id(&block_id, i, f);
-//                if (error)
-//                        return false;
-//                to = ptr - addr % bs + (i - first_block) * bs;
-//                read_fsb(to , i);
-//        }
-//
-//}
-//
-
-#define next_id(block,size) (*((uint32_t*)(((uint8_t*)block)+size-4)))
-#define set_next_id(block,size,id) \
-        (*((uint32_t*)(((uint8_t*)block)+size-4)))=id
+static bool visit_for_read(struct visit_arg * arg)
+{
+        struct rw_arg* og = (struct rw_arg*)(arg->other_arg);
+        uint32_t bs = arg->f->block_size;
+        uint32_t len;
+        uint8_t *buffer = NULL;
+        //if (og->now < og->begin || og->now > og->end) {
+        //        return false;
+        //}
+        /* If can not read a block to ptr immediately, 
+         * it need a buffer to store a block for fear of out_of_range */
+        if (og->offset != 0 || count < bs) {
+                buffer = (uint8_t*)malloc(bs);
+                if (!buffer)
+                        return false;
+                read_fsb(buffer, arg->now_block_id);
+                len = og->offset + count <= bs ? count : bs - og->offset;
+                memcpy((void*)(og->ptr), (void*)(buffer + og->offset), len);
+                free(buffer);
+        } else {
+                read_fsb(og->ptr, arg->now_block_id);
+                len = bs;
+        }
+        og->count -= len;
+        og->offset = 0;
+        og->ptr += len;
+        return true;
+}
 
 bool read(uint8_t* ptr, uint32_t addr, uint32_t size, struct fcb* f)
 {
-        uint32_t block_id, n, bs;
-        int count, i;
-        uint8_t* buffer = NULL, to = NULL;
-        bool error;
-        if (!f || !ptr || f->size < addr + size) {
+        uint32_t begin = addr / f->block_size;
+        uint32_t count = (addr + size) / f->block_size - begin + 1;
+        struct visit_arg arg;
+        struct rw_arg og;
+        if (!ptr && addr + size > MAX_FILE_SIZE) {
                 return false;
         }
-        bs = f->block_size;
-        buffer = (uint8_t*)malloc(block_size);
-        if (!buffer) {
-                return false;
-        }
-        /* get the first block id */
-        error = !get_block_id(&block_id, addr / bs, f);
-        if (error) {
-                return false;
-        }
-        read_fsb(buffer, block_id);
-        count = (addr + size - 1) / bs - addr / bs - 1;
-        /* 'count' = total blocks - 2 */
-        if (count == -1) {
-                memcpy((void*)ptr, (void*)(buffer + addr % bs), size);
-        } else {
-                memcpy((void*)ptr, (void*)(buffer + addr % bs), bs - addr % bs);
-        }
-        /* deal with blocks between the first and last block */
-        to = ptr + bs - addr % bs;
-        block_id = next_id(buffer, bs);
-        for (i = 0; i < count; ++i) {
-                error = !read_fsb(to, block_id);
-                if (error) {
-                        return false;
-                }
-                block_id = next_id(to, bs);
-                to = to + bs;
-        }
-        /* deal with last block */
-        if (count >= 0) {
-                error = !read_fsb(buffer, block_id);
-                if (error) {
-                        return false;
-                }
-                memcpy(to, buffer, (addr + size) % bs);
-        }
-        return true;
+        arg.now = 0;
+        arg.now_block_id = 0;
+        arg.f = f;
+        arg.other_arg = (void*)(&og);
+        og.count = size;
+        og.offset = addr % f->block_size;
+        og.ptr = ptr;
+        return visit_file_blocks(begin , count, arg, visit_for_read, f);
 }
 
 /* variable=true, means the size of file wouble be change to (addr+size) */
 bool write(uint8_t* ptr, uint32_t addr, uint32_t size, struct fcb* f, 
                 bool variable)
 {
-        uint32_t block_id, n, bs;
-        int count, i;
-        uint8_t* buffer = NULL, to = NULL;
-        bool error;
-        if (!f || !ptr || f->size < addr + size) {
-                return false;
-        }
-        if (variable) {
-                change_len(addr, size, f);
-        }
-        bs = f->block_size;
-        buffer = (uint8_t*)malloc(block_size);
-        if (!buffer) {
-                return false;
-        }
-        /* get the first block id */
-        error = !get_block_id(&block_id, addr / bs, f);
-        if (error) {
-                return false;
-        }
-        read_fsb(buffer, block_id);
-        count = (addr + size - 1) / bs - addr / bs - 1;
-        /* 'count' = total blocks - 2 */
-        if (count == -1) {
-                memcpy((void*)ptr, (void*)(buffer + addr % bs), size);
-        } else {
-                memcpy((void*)ptr, (void*)(buffer + addr % bs), bs - addr % bs);
-        }
-        /* deal with blocks between the first and last block */
-        to = ptr + bs - addr % bs;
-        block_id = next_id(buffer, bs);
-        for (i = 0; i < count; ++i) {
-                error = !read_fsb(to, block_id);
-                if (error) {
-                        return false;
-                }
-                block_id = next_id(to, bs);
-                to = to + bs;
-        }
-        /* deal with last block */
-        if (count >= 0) {
-                error = !read_fsb(buffer, block_id);
-                if (error) {
-                        return false;
-                }
-                memcpy(to, buffer, (addr + size) % bs);
-        }
         return true;
 }
 
