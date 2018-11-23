@@ -17,63 +17,120 @@ struct visit_arg {
         void *other_arg;
 };
 
-/* This function provides a recursive method to visit blocks in multistage indexes,
- * like 'single_indirect', 'double_indirect' and so on. */
-static bool visit_blocks(uint32_t root, uint32_t degree, uint32_t max_degree, 
+
+static bool visit_blocks(uint32_t root, uint32_t max_degree, 
                 uint32_t begin, uint32_t count, visit_arg *args,
                 bool (*visit)(struct visit_arg *),
                 struct fcb *f)
 {
-        uint32_t step_size, i, steps, leftover, b, c;
-        uint8_t *buffer = NULL;
-        uint32_t *p;
-        if (!f || !visit || count == 0)
+        uint32_t bs, step, last_step, now_step, offset, i;
+        uint8_t* buffer = NULL;
+        bool error;
+        if (!f || !visit || count == 0) {
                 return false;
+        }
+        bs = f->block_size;
+        step = bs / 4;
+        last_step = step - 1;
         buffer = (uint8_t*)malloc(f->block_size);
-        if (!buffer) {
+        if (!buffer)
                 return false;
-        } else {
+        now_step = pow(step, max_degree - 1) * last_step;
+        while (max_degree--) {
+                error = !read_fsb(buffer, root);
+                if (error)
+                        return false;
+                if (!max_degree) {
+                        now_step = 1;
+                } else {
+                        now_step /= last_step;
+                }
+                offset = begin / now_step;
+                root = *(((uint32_t*)buffer) + offset);
+                begin -= offset * now_step;
+        }
+        /* visit the data indexed by the last index */
+        i = begin;
+        while (true) {
+                for (; i < last_step && i < count; ++i) {
+                        args->now_block_id = *(((uint32_t*)buffer) + i);
+                        error = !visit(args);
+                        if (error)
+                                return false;
+                        ++(args->now);
+                }
+                i = 0;
+                if (count < last_step) {
+                        count = 0;
+                } else {
+                        count -= last_step - begin;
+                }
+                if (count == 0)   // end
+                        break;
+                root = *(((uint32_t*)buffer) + last_step); // get next index block id
                 read_fsb(buffer, root);
         }
-        if (degree > max_degree) {  // arrive leaf node
-                args->now_block_id = root;
-                error = !visit(args);
-                if (error)
-                        return false;
-                ++(args->now);
-                return true;
-        }
-        steps = f->block_size / 4;
-        step_size = pow(steps, max_degree - degree);
-        /* visit the first step */
-        p = (uint32_t*)(buffer + (begin / step_size) * 4);
-        c = step_size - begin % step_size;
-        if (count <= c)
-                c = count;
-        error = !visit_blocks(*p, degree+1, max_degree, begin, c, args, visit, f);
-        if (error)
-                return false;
-        if (count == c)     // it means there is only one step need to visit in this degree
-                return true;
-        leftover = count - c;
-        b = begin + c;
-        p = p + 1;
-        /* middle steps */
-        while(leftover > step_size) {
-                error = !visit_blocks(*p, degree+1, max_degree, b, step_size, args, visit, f);
-                if (error)
-                        return false;
-                leftover = leftover - step_size;
-                p = p + 1;
-                b = b + step_size;
-        }
-        /* last steps */
-        error = !visit_blocks(*p, degree+1, max_degree, b, leftover, args, visit, f);
-        if (error)
-                return false;
-        free(buffer);
         return true;
 }
+
+/* This function provides a recursive method to visit blocks in multistage indexes,
+ * such as 'single_indirect', 'double_indirect' and so on. */
+//static bool visit_blocks(uint32_t root, uint32_t degree, uint32_t max_degree, 
+//                uint32_t begin, uint32_t count, visit_arg *args,
+//                bool (*visit)(struct visit_arg *),
+//                struct fcb *f)
+//{
+//        uint32_t step_size, i, steps, leftover, b, c;
+//        uint8_t *buffer = NULL;
+//        uint32_t *p;
+//        if (!f || !visit)
+//                return false;
+//        buffer = (uint8_t*)malloc(f->block_size);
+//        if (!buffer) {
+//                return false;
+//        } else {
+//                read_fsb(buffer, root);
+//        }
+//        if (degree > max_degree) {  // arrive leaf node
+//                args->now_block_id = root;
+//                error = !visit(args);
+//                if (error)
+//                        return false;
+//                ++(args->now);
+//                return true;
+//        }
+//        steps = f->block_size / 4;
+//        step_size = pow(steps, max_degree - degree);
+//        /* visit the first step */
+//        ///////////////////////////////// begin is wrong!!!!!!!!!!!!1
+//        p = (uint32_t*)(buffer + s * 4);
+//        c = step_size - begin % step_size;
+//        if (count <= c)
+//                c = count;
+//        error = !visit_blocks(*p, degree+1, max_degree, begin, c, args, visit, f);
+//        if (error)
+//                return false;
+//        if (count == c)     // it means there is only one step need to be visited in this degree
+//                return true;
+//        leftover = count - c;
+//        b = begin + c;
+//        p = p + 1;
+//        /* middle steps */
+//        while(leftover > step_size) {  // here may be wrong
+//                error = !visit_blocks(*p, degree+1, max_degree, b, step_size, args, visit, f);
+//                if (error)
+//                        return false;
+//                leftover = leftover - step_size;
+//                p = p + 1;
+//                b = b + step_size;
+//        }
+//        /* last steps */
+//        error = !visit_blocks(*p, degree+1, max_degree, b, leftover, args, visit, f);
+//        if (error)
+//                return false;
+//        free(buffer);
+//        return true;
+//}
 
 static bool visit_direct(uint32_t begin, uint32_t count, void* args,
                 bool (*visit)(struct visit_arg *),
@@ -118,7 +175,7 @@ static bool visit_index(uint32_t level, uint32_t begin, uint32_t count, void* ar
         } else if (level == 2) {
                 root_id = f->double_indirect;
         }
-        return visit_blocks(root_id, 1, level, begin, count, args, visit, f);
+        return visit_blocks(root_id, level, begin, count, args, visit, f);
 }
 
 static bool visit_file_blocks(uint32_t begin, uint32_t count, void* args,
