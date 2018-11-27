@@ -66,64 +66,11 @@ static bool visit_blocks(uint32_t root, uint32_t max_degree,
         return true;
 }
 
-/* This function provides a recursive method to visit blocks in multistage indexes,
- * such as 'single_indirect', 'double_indirect' and so on. */
-//static bool visit_blocks(uint32_t root, uint32_t degree, uint32_t max_degree, 
-//                uint32_t begin, uint32_t count, visit_arg *args,
-//                bool (*visit)(struct visit_arg *),
-//                struct fcb *f)
-//{
-//        uint32_t step_size, i, steps, leftover, b, c;
-//        uint8_t *buffer = NULL;
-//        uint32_t *p;
-//        if (!f || !visit)
-//                return false;
-//        buffer = (uint8_t*)malloc(f->block_size);
-//        if (!buffer) {
-//                return false;
-//        } else {
-//                read_fsb(buffer, root);
-//        }
-//        if (degree > max_degree) {  // arrive leaf node
-//                args->now_block_id = root;
-//                error = !visit(args);
-//                if (error)
-//                        return false;
-//                ++(args->now);
-//                return true;
-//        }
-//        steps = f->block_size / 4;
-//        step_size = pow(steps, max_degree - degree);
-//        /* visit the first step */
-//        ///////////////////////////////// begin is wrong!!!!!!!!!!!!1
-//        p = (uint32_t*)(buffer + s * 4);
-//        c = step_size - begin % step_size;
-//        if (count <= c)
-//                c = count;
-//        error = !visit_blocks(*p, degree+1, max_degree, begin, c, args, visit, f);
-//        if (error)
-//                return false;
-//        if (count == c)     // it means there is only one step need to be visited in this degree
-//                return true;
-//        leftover = count - c;
-//        b = begin + c;
-//        p = p + 1;
-//        /* middle steps */
-//        while(leftover > step_size) {  // here may be wrong
-//                error = !visit_blocks(*p, degree+1, max_degree, b, step_size, args, visit, f);
-//                if (error)
-//                        return false;
-//                leftover = leftover - step_size;
-//                p = p + 1;
-//                b = b + step_size;
-//        }
-//        /* last steps */
-//        error = !visit_blocks(*p, degree+1, max_degree, b, leftover, args, visit, f);
-//        if (error)
-//                return false;
-//        free(buffer);
-//        return true;
-//}
+/* if n < MAX_DIRECT_LEN , this function will fail. */
+static uint32_t get_parent_of_leaf(uint32_t n, struct fcb* f) {
+        n -= MAX_DIRECT_LEN;
+        //////////////////
+}
 
 static bool visit_direct(uint32_t begin, uint32_t count, void* args,
                 bool (*visit)(struct visit_arg *),
@@ -197,18 +144,7 @@ static bool visit_file_blocks(uint32_t begin, uint32_t count, void* args,
         }
 }
 
-//struct visit_arg {
-//        uint32_t now;
-//        uint32_t now_block_id;
-//        struct fcb *f;
-//        void *other_arg;
-//};
-//static bool visit_file_blocks(uint32_t begin, uint32_t count, void* args,
-//                bool (*visit)(struct visit_arg *),
-//                struct fcb *f)
 struct rw_arg {
-        //uint32_t begin;  // the first block
-        //uint32_t end;    // the last block
         uint32_t count;  // remaining bytes
         uint32_t offset;
         uint8_t *ptr;
@@ -220,9 +156,6 @@ static bool visit_for_read(struct visit_arg * arg)
         uint32_t bs = arg->f->block_size;
         uint32_t len;
         uint8_t *buffer = NULL;
-        //if (og->now < og->begin || og->now > og->end) {
-        //        return false;
-        //}
         /* If can not read a block to ptr immediately, 
          * it need a buffer to store a block for fear of out_of_range */
         if (og->offset != 0 || count < bs) {
@@ -245,13 +178,14 @@ static bool visit_for_read(struct visit_arg * arg)
 
 bool read(uint8_t* ptr, uint32_t addr, uint32_t size, struct fcb* f)
 {
-        uint32_t begin = addr / f->block_size;
-        uint32_t count = (addr + size) / f->block_size - begin + 1;
+        uint32_t begin, count;
         struct visit_arg arg;
         struct rw_arg og;
-        if (!ptr && addr + size > MAX_FILE_SIZE) {
+        if (!ptr || addr + size > max_data_size(f)) {
                 return false;
         }
+        begin = addr / f->block_size;
+        count = (addr + size) / f->block_size - begin + 1;
         arg.now = 0;
         arg.now_block_id = 0;
         arg.f = f;
@@ -262,11 +196,92 @@ bool read(uint8_t* ptr, uint32_t addr, uint32_t size, struct fcb* f)
         return visit_file_blocks(begin , count, arg, visit_for_read, f);
 }
 
-/* variable=true, means the size of file wouble be change to (addr+size) */
+//struct visit_arg {
+//        uint32_t now;
+//        uint32_t now_block_id;
+//        struct fcb *f;
+//        void *other_arg;
+//};
+//static bool visit_file_blocks(uint32_t begin, uint32_t count, void* args,
+//                bool (*visit)(struct visit_arg *),
+//                struct fcb *f)
+//struct rw_arg {
+//        uint32_t count;  // remaining bytes
+//        uint32_t offset;
+//        uint8_t *ptr;
+//}
+
+bool visit_for_write(struct visit_arg *arg)
+{
+        struct rw_arg* og = (struct rw_arg*)(arg->other_arg);
+        uint32_t bs = arg->f->block_size;
+        uint32_t len;
+        uint8_t *buffer = NULL;
+        /* If can not write a block to extenal storage immediately, 
+         * it need a buffer to store a block for fear of out_of_range,
+         * and nead to read the block before write a part of it. */
+        if (og->offset != 0 || count < bs) {
+                buffer = (uint8_t*)malloc(bs);
+                if (!buffer)
+                        return false;
+                read_fsb(buffer, arg->now_block_id);
+                len = og->offset + count <= bs ? count : bs - og->offset;
+                memcpy((void*)(buffer + og->offset), (void*)(og->ptr), len);
+                write_fsb(buffer, arg->now_block_id);
+                free(buffer);
+        } else {
+                write_fsb(og->ptr, arg->now_block_id);
+                len = bs;
+        }
+        og->count -= len;
+        og->offset = 0;
+        og->ptr += len;
+        return true;
+}
+
+/* variable=true, means the size of file wouble be adjust to (addr+size) */
 bool write(uint8_t* ptr, uint32_t addr, uint32_t size, struct fcb* f, 
                 bool variable)
 {
-        return true;
+        uint32_t begin, count;
+        struct visit_arg arg;
+        struct rw_arg og;
+        if (!ptr || (!variable && addr + size > max_data_size(f))) {
+                return false;
+        }
+        if (variable) {
+                error = !adjust_file_size(addr + size, f);
+                if (error)
+                        return false;
+        }
+        begin = addr / f->block_size;
+        count = (addr + size) / f->block_size - begin + 1;
+        arg.now = 0;
+        arg.now_block_id = 0;
+        arg.f = f;
+        arg.other_arg = (void*)(&og);
+        og.count = size;
+        og.offset = addr % f->block_size;
+        og.ptr = ptr;
+        return visit_file_blocks(begin , count, arg, visit_for_write, f);
+}
+
+
+
+static bool adjust_file_size(uint32_t size, struct fcb* f)
+{
+
+}
+
+static bool add_blocks(uint32_t num, struct fcb* f)
+{
+        if (f->size / f->block_size)
+}
+
+/* remove blocks from tail to head */
+static bool remove_blocks(uint32_t num, struct fcb* f)
+{
+
 }
 
 bool clear(struct fcb* f);
@@ -274,7 +289,19 @@ bool resize(uint32_t size);
 
 uint32_t max_data_size(struct fcb *f)
 {
-        uint32_t index_size = f->block_size/4;
-        return (MAX_DIRECT_LEN+index_size+index_size*index_size)*(f->block_size-4);
+        if (!f)
+                return 0;
+        return max_data_block(f) * f->block_size;
 }
-uint32_t total_block_count(struct fcb *f)
+
+static uint32_t max_data_block(struct fcb *f)
+{
+        uint32_t is = f->block_size/4;
+        return (MAX_DIRECT_LEN+(is+1)*(is-1));
+}
+
+/* include blocks for indexes */
+uint32_t fcb_block_count(struct fcb *f)
+{
+
+}
