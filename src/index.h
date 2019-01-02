@@ -8,7 +8,7 @@ struct index_iterator {
         struct fcb *f;
         void* buffer;
         uint32_t pos;
-        uint32_t begin;
+        uint32_t lid;
 };
 
 struct index_iterator *create(uint32_t pos, struct fcb *f);

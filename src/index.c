@@ -27,41 +27,97 @@ bool set_pos(uint32_t pos, struct index_iterator *ii)
 {
         if (!ii || !(ii->f))
                 return false;
-        if (need_updata_buffer(pos, ii)) {
-                if (!updata_buffer(pos, ii))
+        if (pos >= MAX_DIRECT_LEN) {
+                if (!(ii->buffer))
+                        buffer = malloc(ii->f->block_size);
+                if (!buffer)
                         return false;
         }
+        if (need_update_buffer(pos, ii)) {
+                if (!update_buffer(pos, ii))
+                        return false;
+                ii->lid = leaf_id(pos, ii->f->block_size / 4);
+        }
         ii->pos = pos;
-        ii->begin = get_leaf_begin();
+        if (pos < MAX_DIRECT_LEN)
+                ii->lid = 0;
         return true;
 }
 
-uint32_t get_data(struct index_iterator *ii);
-bool add_leaves(uint32_t n, struct fcb *f)
+uint32_t get_data(struct index_iterator *ii)
 {
-        if (f->block_count )
+        uint32_t pos = ii->pos;
+        if (pos < MAX_DIRECT_LEN)
+                return ii->f->direct[ii->pos];
+        pos -= MAX_DIRECT_LEN;
+        return *(((uint32_t*)(ii->buffer)) + pos % (ii->f->block_size / 4 - 1));
 }
-bool remove_leaves(uint32_t n, struct fcb *f);
 
-static bool need_updata_buffer(uint32_t pos, struct index_iterator *ii)
+bool add_leaves(uint32_t n, struct fcb *f)
+{}
+bool remove_leaves(uint32_t n, struct fcb *f)
+{}
+
+/*
+static bool need_update_buffer(uint32_t pos, struct index_iterator *ii)
+static bool update_buffer(uint32_t pos, struct index_iterator *ii)
+static bool update_from_tail(struct index_iterator *ii)
+static bool update_from_root(uint32_t pos, struct index_iterator *ii)
+
+static bool read_leaf_from_tree(uint32_t ipos, uint32_t root, uint32_t leaf_degree,
+static bool is_next_leaf(uint32_t pos, struct index_iterator *ii)
+static uint32_t root(uint32_t pos, uint32_t len, struct fcb* f)
+static uint32_t inner_pos(uint32_t pos, uint32_t len)
+static uint32_t leaf_id(uint32_t pos, uint32_t len)
+static uint32_t tree_depth(uint32_t pos, uint32_t len)
+*/
+
+static bool need_update_buffer(uint32_t pos, struct index_iterator *ii)
 {
+        uint32_t len;
+        if (pos < MAX_DIRECT_LEN)
+                return false;
+        len = ii->f->block_size / 4;
+        if (ii->lid == leaf_id(pos, len))
+                return false;
+        return true;
 }
-static bool updata_buffer(uint32_t pos, struct index_iterator *ii)
+
+static bool update_buffer(uint32_t pos, struct index_iterator *ii)
 {
         bool re;
-        if (is_next_block(ii->pos, pos)) {
-                re = updata_from_tail(ii);
+        if (is_next_leaf(pos, ii)) {
+                re = update_from_tail(ii);
         } else {
-                re = updata_from_root(pos, ii);
+                re = update_from_root(pos, ii);
         }
         return re;
 }
-static bool updata_from_tail(struct index_iterator *ii)
-{}
-static bool updata_from_root(uint32_t pos, struct index_iterator *ii)
-{}
 
-static uint32_t get_indirect(uint32_t pos, uint32_t len)
+static uint32_t leaf_id(uint32_t pos, uint32_t len)
+{
+        if (pos < MAX_DIRECT_LEN)
+                return 0;
+        return (pos - MAX_DIRECT_LEN) / len + 1;
+}
+
+static bool update_from_tail(struct index_iterator *ii)
+{
+        uint32_t len = ii->f->block_size / 4;
+        if (ii->pos < MAX_DIRECT_LEN)
+                return read_fsb(ii->f->single_indirect, ii->buffer);
+        else
+                return read_fsb(*(((uint32_t*)(ii->buffer))+len-1), ii->buffer);
+}
+
+static bool update_from_root(uint32_t pos, struct index_iterator *ii)
+{
+        uint32_t len = ii->f->block_size / 4;
+        return read_leaf_from_tree(inner_pos(pos), root(pos, len, ii->f),
+                        tree_depth(pos, len), ii->buffer, ii->f);
+}
+
+static uint32_t tree_depth(uint32_t pos, uint32_t len)
 {
         uint32_t re = 0;
         if (pos < MAX_DIRECT_LEN)
@@ -76,7 +132,7 @@ static uint32_t get_indirect(uint32_t pos, uint32_t len)
         return re;
 }
 
-static uint32_t get_inner_pos(uint32_t pos, uint32_t len)
+static uint32_t inner_pos(uint32_t pos, uint32_t len)
 {
         if (pos < MAX_DIRECT_LEN)
                 return pos;
@@ -89,11 +145,9 @@ static uint32_t get_inner_pos(uint32_t pos, uint32_t len)
         return pos;
 }
 
-static uint32_t get_root(uint32_t pos, uint32_t len, struct fcb* f)
+static uint32_t root(uint32_t pos, uint32_t len, struct fcb* f)
 {
-        if (pos < MAX_DIRECT_LEN)
-                return f->direct[pos];
-        uint32_t idt = get_indirect(pos, len);
+        uint32_t idt = tree_depth(pos, len);
         if (idt == 1)
                 return f->single_indirect;
         if (idt == 2)
@@ -101,12 +155,14 @@ static uint32_t get_root(uint32_t pos, uint32_t len, struct fcb* f)
         return 0;
 }
 
-static bool is_neighbour(uint32_t pos1, uint32_t pos2, uint32_t len)
+static bool is_next_leaf(uint32_t pos, struct index_iterator *ii)
 {
-
+        if (ii->lid + 1 == leaf_id(pos, len))
+                return true;
+        return false;
 }
 
-static bool read_leaves(uint32_t n, uint32_t root, uint32_t leaf_degree,
+static bool read_leaf_from_tree(uint32_t inner_pos, uint32_t root, uint32_t leaf_degree,
                 void* buffer, struct fcb *f)
 {
         if (!f || !buffer)
@@ -114,15 +170,15 @@ static bool read_leaves(uint32_t n, uint32_t root, uint32_t leaf_degree,
         uint32_t len = f->block_size / 4;
         uint32_t step_size = pow(len, leaf_degree - 2) * (len - 1);
         bool error = false;
-        while (leaf_degree--) {
+        while (true) {
                 error = !read_fsb(root, buffer);
                 if (error)
                         return false;
-                if (leaf_degree == 0)
+                if (--leaf_degree == 0)
                         break;
-                root = *(((uint32_t*)buffer)+n/step_size);
+                root = *(((uint32_t*)buffer)+ipos/step_size);
                 step_size /= len;
-                n -= n / step_size * step_size;
+                ipos -= ipos / step_size * step_size;
         }
         return true;
 }
