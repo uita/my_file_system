@@ -1,22 +1,26 @@
 #ifndef SUPER_BLOCK_H
 #define SUPER_BLOCK_H
 
-#include "stdint.h"
+#include "type.h"
 
 struct super_block {
         /* needed for install */
-        uint32_t disk_capacity;   /* bytes */ 
+        __u32 disk_capacity;   /* bytes */ 
 
-        uint32_t super_block_addr;
-        uint32_t fcb_zone_addr;
-        uint32_t fsb_zone_addr;
-        uint32_t fcb_size;
-        uint32_t fsb_size;      /* block size */
-        uint32_t max_fcb_num;
-        uint32_t max_fsb_num;
-        uint32_t fcb_ids[5];
-        uint32_t fsb_ids[128];
-        int32_t fsb_sp;
+        __u32 super_block_addr;
+        __u32 inode_zone_addr;
+        __u32 block_zone_addr;
+        __u32 inode_size;
+        __u32 block_size;      /* block size */
+        __u32 max_inode_num;
+        __u32 max_block_num;
+        __u32 iids[5];
+        __u32 bids[128];
+        __32  block_sp;
+        __u32 ibuf_rc;
+        __u32 ibuf_rs;
+        __u32 bbuf_rc;
+        __u32 bbuf_rs;
 };
 
 #endif

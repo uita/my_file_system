@@ -5,7 +5,7 @@
 #include "stdbool.h"
 
 /* Byte */
-bool read_disk(void* ptr, uint32_t disk_addr, uint32_t size);
-bool write_disk(void* ptr, uint32_t disk_addr, uint32_t size);
+int read_disk(void* ptr, uint32_t disk_addr, uint32_t size);
+int write_disk(void* ptr, uint32_t disk_addr, uint32_t size);
 
 #endif

@@ -64,7 +64,7 @@ static bool update_buffer(uint32_t pos, struct index_iterator *ii)
 static bool update_from_tail(struct index_iterator *ii)
 static bool update_from_root(uint32_t pos, struct index_iterator *ii)
 
-static bool read_leaf_from_tree(uint32_t ipos, uint32_t root, uint32_t leaf_degree,
+static bool read_leaf_from_tree(uint32_t ipos, uint32_t root, uint32_t leaf_depth,
 static bool is_next_leaf(uint32_t pos, struct index_iterator *ii)
 static uint32_t root(uint32_t pos, uint32_t len, struct fcb* f)
 static uint32_t inner_pos(uint32_t pos, uint32_t len)
@@ -114,14 +114,14 @@ static bool update_from_root(uint32_t pos, struct index_iterator *ii)
 {
         uint32_t len = ii->f->block_size / 4;
         return read_leaf_from_tree(inner_pos(pos), root(pos, len, ii->f),
-                        tree_depth(pos, len), ii->buffer, ii->f);
+                        tree_depth(pos, len), ii->buffer, ii->f);	// 'root' will never be 0
 }
 
 static uint32_t tree_depth(uint32_t pos, uint32_t len)
 {
-        uint32_t re = 0;
+        uint32_t re = 1;
         if (pos < MAX_DIRECT_LEN)
-                return re;
+                return 0;
         pos -= MAX_DIRECT_LEN;
         --len;
         while (pos >= len) {
@@ -162,23 +162,30 @@ static bool is_next_leaf(uint32_t pos, struct index_iterator *ii)
         return false;
 }
 
-static bool read_leaf_from_tree(uint32_t inner_pos, uint32_t root, uint32_t leaf_degree,
+static bool read_leaf_from_tree(uint32_t ipos, uint32_t root, uint32_t leaf_depth,
                 void* buffer, struct fcb *f)
 {
         if (!f || !buffer)
                 return false;
         uint32_t len = f->block_size / 4;
-        uint32_t step_size = pow(len, leaf_degree - 2) * (len - 1);
+	uint32_t step_size = 1;
+	uint32_t offset;
         bool error = false;
+	if (leaf_depth > 1) {
+		step_size = len - 1;
+		if (leaf_depth > 2)
+			step_size *= pow(len, leaf_depth - 2);
+	}
         while (true) {
                 error = !read_fsb(root, buffer);
                 if (error)
                         return false;
-                if (--leaf_degree == 0)
+                if (--leaf_depth == 0)
                         break;
-                root = *(((uint32_t*)buffer)+ipos/step_size);
+		offset = ipos / step_size;
+                root = *(((uint32_t*)buffer) + offset);
+                ipos -= offset * step_size;
                 step_size /= len;
-                ipos -= ipos / step_size * step_size;
         }
         return true;
 }
