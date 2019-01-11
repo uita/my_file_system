@@ -20,7 +20,7 @@ struct dmap *dmap_init(__u32 rc, __u32 rs,
         dm->tag = (__u32*)malloc(sizeof(__u32) * rc);
         if (!(dm->tag))
                 goto malloc_failed;
-        dm->dirty = malloc(rc / 8);
+        dm->dirty = malloc((rc - 1) / 8 + 1);
         if (!(dm->dirty))
                 goto malloc_failed;
         dm->rows = malloc(sizeof(void*) * rc);
