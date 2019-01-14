@@ -3,7 +3,6 @@
 
 #define set_dirty(lb) lb->info |= 0x80000000;
 #define clear_dirty(lb) lb->info &= 0x7fffffff;
-#define is_dirty(lb) (lb->info & 0x80000000);
 
 struct lru_que *lru_init(__u32 ml, __u32 bs, 
                 (int)(*rfd)(void *, __u32), (int)(*wtd)(void *, __u32))
@@ -89,7 +88,8 @@ int lru_write(void* b, __u32 id, struct lru_que *lq)
         return 1;
 }
 
-static struct lru_buf *create_lru_buf(struct lru_que *lq) {
+static struct lru_buf *create_lru_buf(struct lru_que *lq)
+{
         struct lru_buf *b = (struct lru_buf *)malloc(sizeof(struct lru_buf));
         if (!b)
                 return NULL;
@@ -102,7 +102,8 @@ static struct lru_buf *create_lru_buf(struct lru_que *lq) {
         return b;
 }
 
-static void destroy_lru_buf(struct lru_buf *b) {
+static void destroy_lru_buf(struct lru_buf *b)
+{
         if (!b)
                 return;
         if (b->buf)
@@ -111,7 +112,8 @@ static void destroy_lru_buf(struct lru_buf *b) {
 }
 
 /* the highest bit of 'info' is the dirty bit */
-static void add_rcount(struct lru_buf* lb) {
+static void add_rcount(struct lru_buf* lb)
+{
         if (lb->info << 1 == 0xfffffffe)
                 return;
         lb->info += 1;

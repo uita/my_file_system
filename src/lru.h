@@ -19,6 +19,9 @@ struct lru_buf {
         struct list_node var;
 };
 
+#define is_dirty(lb) (lb->info & 0x80000000)
+#define get_rcount(lb) (lb->info & 0x7fffffff)
+
 struct lru_que *lru_init(__u32 ml, __u32 bs, 
                 (int)(*rfd)(void *, __u32), (int)(*wtd)(void *, __u32));
 
@@ -28,6 +31,7 @@ void *lru_read(__u32 id, struct lru_que *lq);
 /* not really write to disk but buffer */
 int lru_write(void* b, __u32 id, struct lru_que *lq);
 
+__u32 lru_rcount(lru_buf *lb);
 //int lru_ismatch(__u32 id, struct lru_que *lq);
 
 //int sync(struct lru_que *lq);

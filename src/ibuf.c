@@ -1,8 +1,9 @@
 #include "super_block.h"
 #include "rw.h"
 #include "ibuffer.h"
+#include "two_que.h"
 
-static struct dmap *_dm = NULL;
+static struct two_que *_tq = NULL;
 
 int rfd(void *inode, __u32 id)
 {
@@ -16,24 +17,24 @@ int wtd(void *inode, __u32 id)
 
 int ibuf_init(struct super_block *sb)
 {
-        _dm = dmap_init(sb->ibuf_rc, sb->ibuf_rs, rfd, wtd);
-        if (!_dm)
-                return false;
-        return true;
+        ///////
+        _tq = tq_init(sb->ibuf_bs, sb->ibuf_ml, sb->ibuf_ml, rfd, wtd);
+        if (!_tq)
+                return 0;
+        return 1;
 }
 
 void ibuf_uninit()
 {
-        if (_dm)
-                dmap_uninit(_dm);
+        tq_uninit(_tq);
 }
 
 void *ibuf_read(void *inode, __u32 iid)
 {
-        return read_row(iid, _dm);
+        return tq_read(iid, _tq);
 }
 
 int ibuf_write(void *inode, __u32 iid)
 {
-        return write_row(inode, iid, _dm);
+        return tq_write(inode, iid, _tq);
 }

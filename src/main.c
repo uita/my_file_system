@@ -20,6 +20,11 @@ void test_init(struct super_block *sb) {
         sb->max_block_num = (sb->disk_capacity - sb->block_zone_addr) / sb->block_size;
         memset((void*)(sb->iids), 0, 20);
         memset((void*)(sb->bids), 0, 512);
+        sb->block_sp = 0;
+        ibuf_bs = sb->inode_size;
+        ibuf_ml = 10;
+        bbuf_bs = sb->block_size;
+        bbuf_ml = 5;
 }
 
 int main() {
@@ -30,6 +35,7 @@ int main() {
         balloc_init(&sb);
         build_bindex();
         balloc_uninit(&sb);
+        rw_uninit(&sb);
         write_super_block(&sb);
 
         /* run */

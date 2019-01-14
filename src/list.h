@@ -15,7 +15,8 @@ struct list_node {
 
 #define create_list(ls, type) \
         ls = (struct list *)malloc(sizeof(struct list)); \
-        memset(ls, 0, sizeof(struct list));
+        if (ls) \
+                memset(ls, 0, sizeof(struct list));
 
 #define destroy_list(ls) \
         if (ls) \

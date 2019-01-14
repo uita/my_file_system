@@ -1,8 +1,8 @@
 #include "bbuf.h"
-#include "dmap.h"
+#include "tqap.h"
 #include "rw.h"
 
-struct dmap *_dm;
+struct two_que *_tq;
 
 int rfd(void *block, __u32 id)
 {
@@ -16,24 +16,23 @@ int wtd(void *block, __u32 id)
 
 int bbuf_init(struct super_block *sb)
 {
-        _dm = dmap_init(sb->bbuf_rc, sb->bbuf_rs, rfd, wtd);
-        if (!_dm)
+        _tq = tq_init(sb->bbuf_bs, sb->bbuf_ml, sb->bbuf_ml, rfd, wtd);
+        if (!_tq)
                 return false;
         return true;
 }
 
 void bbuf_uninit()
 {
-        if (_dm)
-                dmap_uninit(_dm);
+        tq_uninit(_tq);
 }
 
 void *bbuf_read(__u32 bid)
 {
-        return read_row(bid, _dm);
+        return tq_read(bid, _tq);
 }
 
 int bbuf_write(void *block, __u32 bid)
 {
-        return write_row(block, bid, _dm);
+        return tq_write(block, bid, _tq);
 }

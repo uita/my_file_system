@@ -1,0 +1,31 @@
+#ifndef TWO_QUE_H
+#define TWO_QUE_H
+
+struct two_que {
+        __u32 max_len1, max_len2;
+        __u32 buf_size;
+        struct list *ls1, *ls2;
+        (int)(*read_from_disk)(void*, __u32);
+        (int)(*write_to_disk)(void*, __u32);
+};
+
+struct tq_node {
+        __u32 id;
+        __u32 info;  // containing information of dirty-bit and read-count
+        void *buf;
+        struct list_node var;
+};
+
+#define is_dirty(node) (node->info & 0x8000000)
+#define get_rcount(node) (node->info & 0x7fffffff)
+
+struct two_que *tq_init(__u32 bs, __u32 ml1, __u32 ml2
+                (int)(*rfd)(void *, __u32), (int)(*wtd)(void *, __u32));
+
+void tq_uninit(struct two_que *tq);
+
+void *tq_read(__u32 id, struct tq_que *tq);
+/* not really write to disk but write to buffer */
+int tq_write(void* data, __u32 id, struct tq_que *tq);
+
+#endif

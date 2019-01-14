@@ -17,10 +17,10 @@ struct super_block {
         __u32 iids[5];
         __u32 bids[128];
         __32  block_sp;
-        __u32 ibuf_rc;
-        __u32 ibuf_rs;
-        __u32 bbuf_rc;
-        __u32 bbuf_rs;
+        __u32 ibuf_bs;
+        __u32 ibuf_ml;
+        __u32 bbuf_bs;
+        __u32 bbuf_ml;
 };
 
 #endif
