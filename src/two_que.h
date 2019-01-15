@@ -1,12 +1,15 @@
 #ifndef TWO_QUE_H
 #define TWO_QUE_H
 
+#include "type.h"
+#include "list.h"
+
 struct two_que {
         __u32 max_len1, max_len2;
         __u32 buf_size;
         struct list *ls1, *ls2;
-        (int)(*read_from_disk)(void*, __u32);
-        (int)(*write_to_disk)(void*, __u32);
+        int (*read_from_disk)(void*, __u32);
+        int (*write_to_disk)(void*, __u32);
 };
 
 struct tq_node {
@@ -19,13 +22,13 @@ struct tq_node {
 #define is_dirty(node) (node->info & 0x8000000)
 #define get_rcount(node) (node->info & 0x7fffffff)
 
-struct two_que *tq_init(__u32 bs, __u32 ml1, __u32 ml2
-                (int)(*rfd)(void *, __u32), (int)(*wtd)(void *, __u32));
+struct two_que *tq_init(__u32 bs, __u32 ml1, __u32 ml2,
+                int (*rfd)(void *, __u32), int (*wtd)(void *, __u32));
 
 void tq_uninit(struct two_que *tq);
 
-void *tq_read(__u32 id, struct tq_que *tq);
+int tq_read(void *data, __u32 id, struct two_que *tq);
 /* not really write to disk but write to buffer */
-int tq_write(void* data, __u32 id, struct tq_que *tq);
+int tq_write(void *data, __u32 id, struct two_que *tq);
 
 #endif

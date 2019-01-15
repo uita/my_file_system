@@ -1,6 +1,6 @@
 #include "super_block.h"
 #include "balloc.h"
-#include "rw.h"
+#include "bbuf.h"
 #include "string.h"
 #include "stdlib.h"
 #include "stdio.h"
@@ -29,8 +29,8 @@ void balloc_init(struct super_block *sb)
 	_max_block_num = sb->max_block_num;
 	_block_size = sb->block_size;
         _max_stack_size = _block_size / sizeof(__u32);
-	_bids = (__u32*)malloc(sizeof(__u32)*_max_stack_size);
         _sp = sb->block_sp;
+        _bids = (__u32 *)malloc(_max_stack_size * _block_size);
         for (i = 0; i < _max_stack_size; ++i) {
                 _bids[i] = sb->bids[i];
         }
@@ -45,8 +45,8 @@ void balloc_uninit(struct super_block *sb)
         for (i = 0; i < _max_stack_size; ++i) {
                 sb->bids[i] = _bids[i];
         }
-	if (_bids != NULL)
-		free(_bids);
+        if (_bids)
+                free(_bids);
 	_bids = NULL;
 	_sp = -1;
 }
@@ -59,10 +59,10 @@ int allocate_block(__u32* bid)
 		return false;
 	bn = _bids[_sp];
 	/* if stack will be empty after allocation and the top of stack 
-	 * is not the first block, it should move a stack from disk 
+	 * is not the first block, it should be replaced by a stack from disk 
 	 * according to the last block id */
 	if (_sp == 0 && _bids[_sp] != _first_block) {
-		error = !read_block(_bids, bn);
+		error = !bbuf_read(_bids, bn);
 		if (error) {
 			printf("failed to read disk while allocating\n");
 			return false;
@@ -85,7 +85,7 @@ int reclaim_block(__u32 bid)
 		_first_block = bid;
 	}
 	if (_sp == _max_stack_size - 1) { /* stack is full, should move the stack to disk */
-		error = !write_block(_bids, bid);
+		error = !bbuf_write(_bids, bid);
 		if (error) {
 			printf("failed to write a block while reclaiming block\n");
 			return false;

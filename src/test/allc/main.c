@@ -3,6 +3,8 @@
 #include "rw.h"
 #include "super_block.h"
 #include "inode.h"
+#include "ibuf.h"
+#include "bbuf.h"
 
 #include "stdio.h"
 #include "stdint.h"
@@ -20,6 +22,11 @@ void test_init(struct super_block *sb) {
         sb->max_block_num = (sb->disk_capacity - sb->block_zone_addr) / sb->block_size;
         memset((void*)(sb->iids), 0, 20);
         memset((void*)(sb->bids), 0, 512);
+        sb->block_sp = 0;
+        sb->ibuf_bs = sb->inode_size;
+        sb->ibuf_ml = 10;
+        sb->bbuf_bs = sb->block_size;
+        sb->bbuf_ml = 5;
 }
 
 int main() {
@@ -27,14 +34,19 @@ int main() {
         struct super_block sb;
         test_init(&sb);
         rw_init(&sb);
+        bbuf_init(&sb);
         balloc_init(&sb);
         build_bindex();
         balloc_uninit(&sb);
+        bbuf_uninit();
+        rw_uninit(&sb);
         write_super_block(&sb);
 
         /* run */
         read_super_block(&sb);
         rw_init(&sb);
+        bbuf_init(&sb);
+        ibuf_init(&sb);
         balloc_init(&sb);
         ialloc_init(&sb);
 
@@ -69,7 +81,7 @@ int main() {
                         printf("recla inode %u failed\n", i);
         }
         printf("\n");
-        printf("============================\n");
+        printf("===================================================================\n");
         uint32_t block_id;
         for (i = 0; i < sb.max_block_num+20; ++i) {
                 if (allocate_block(&block_id)) {
