@@ -5,6 +5,7 @@
 #include "inode.h"
 #include "ibuf.h"
 #include "bbuf.h"
+#include "type.h"
 
 #include "stdio.h"
 #include "stdint.h"
@@ -17,7 +18,8 @@ void test_init(struct super_block *sb) {
         sb->inode_zone_addr = sizeof(struct super_block);
         sb->block_zone_addr = sb->inode_zone_addr + 10240;
         sb->inode_size = sizeof(struct inode);
-        sb->block_size = 512;
+        //sb->block_size = 512;
+        sb->block_size = 12;
         sb->max_inode_num = (sb->block_zone_addr - sb->inode_zone_addr) / sb->inode_size;
         sb->max_block_num = (sb->disk_capacity - sb->block_zone_addr) / sb->block_size;
         memset((void*)(sb->iids), 0, 20);
@@ -49,52 +51,59 @@ int main() {
         ibuf_init(&sb);
         balloc_init(&sb);
         ialloc_init(&sb);
+        ino_init(&sb);
 
         /* test inode */
-        uint32_t inode_id = 0;
-        uint32_t i;
-        for (i = 0; i < 200; ++i) { // max = 160
-                if (allocate_inode(&inode_id))
-                        printf("%u | ", inode_id);
-                else
-                        printf("alloc inode %u failed\n", i);
+        // init one inode
+        __u32 root = 0;
+        ino_alloc(&root);
+        struct inode ino;
+        ino.size = 0;
+        ino.block_count = 0;
+        // 10 + 3 + 9 + 27 = 49
+        // 49 * 12 = 588
+        char wbuf[588];
+        for (int i = 0; i < 588; ++i)
+                wbuf[i] = (char)(i%10+48);
+        char rbuf[588];
+      //int re = ino_cs(49 * 10, &ino);
+        int re = ino_cs(49 * 12, &ino);
+
+        //char bb[12];
+        //for (int i = 7620; i >= 7567; i--) {
+        //        bbuf_read(bb, i);
+        //        //read_block(bb, i);
+        //        memset(bb, 0, 12);
+        //}
+        //for (int i = 0; i < 10; i++) {
+        //        bbuf_read(bb, 7576);
+        //        memset(bb, 0, 12);
+        //}
+        
+
+
+        //re = ino_write(wbuf, 48, &ino);
+        //re = ino_write(wbuf, 48, &ino);
+        //re = ino_read(rbuf, 48, &ino);
+
+
+        for (int i = 0; i < 10; ++i) {
+                printf("%c", rbuf[i]);
+        }
+        for (int i = 0; i < 49; ++i)
+                if (!ino_write(wbuf + i*12, i, &ino))
+                        break;
+        for (int i = 0; i < 49; ++i)
+                if (!ino_read(rbuf + i*12, i, &ino))
+                        break;
+        printf("====================================\n");
+        for (int i = 0; i < 588; ++i) {
+                printf("%c", wbuf[i]);
+        }
+        printf("\n------------------------------------\n");
+        for (int i = 0; i < 588; ++i) {
+                printf("%c", rbuf[i]);
         }
         printf("\n");
-        for (i = 20; i < 160; ++i) {
-                if (reclaim_inode(i))
-                        printf("%u * ", i);
-                else
-                        printf("recla inode %u failed\n", i);
-        }
-        printf("\n");
-        for (i = 0; i < 200; ++i) { // max = 160
-                if (allocate_inode(&inode_id))
-                        printf("%u | ", inode_id);
-                else
-                        printf("alloc inode %u failed\n", i);
-        }
-        printf("\n");
-        for (i = 0; i < 40; ++i) {
-                if (reclaim_inode(i))
-                        printf("%u * ", i);
-                else
-                        printf("recla inode %u failed\n", i);
-        }
-        printf("\n");
-        printf("===================================================================\n");
-        uint32_t block_id;
-        for (i = 0; i < sb.max_block_num+20; ++i) {
-                if (allocate_block(&block_id)) {
-                        printf("alloc block %u success\n", block_id);
-                } else {
-                        printf("alloc block i=%u failed\n", i);
-                }
-        }
-        for (i = 0; i < sb.max_block_num+20; ++i) {
-                if (reclaim_block(i)) {
-                        printf("recla block %u success\n", i);
-                } else {
-                        printf("recla block i=%u failed\n", i);
-                }
-        }
+        return 0;
 }

@@ -1,36 +1,30 @@
 #ifndef FCB_H
 #define FCB_H
 
-/* operations for single file */
-
 #include "stdint.h"
+#include "type.h"
+#include "super_block.h"
 
 #define MAX_NAME_LEN 256
-#define MAX_DIRECT_LEN 11
+#define MAX_DIRECT_LEN 10
+#define INDEX_SIZE 13
 
 struct inode {
         __u32 size;             // data size
         __u32 block_count;      // not include blocks for indexes
-	__u32 direct[MAX_DIRECT_LEN];
-	__u32 single_indirect;
-	__u32 double_indirect;
+	__u32 index[INDEX_SIZE];
         __u32 parent;
 };
 
-int read(void* ptr, __u32 addr, __u32 size, struct inode* ino);
+int ino_init(struct super_block *sb);
+void ino_uninit();
 
-/* var=true, means the size of file wouble be change to (addr+size) */
-int write(void* ptr, __u32 addr, __u32 size, struct inode* ino, int var);
+int ino_read(void *block, __u32 n, struct inode *ino);
+int ino_write(void *block, __u32 n, struct inode *ino);
 
-/* empty the blocks of file but don't delete file */
-int clear(struct inode* f);
+int ino_alloc(__u32 *id);
+int ino_free(__u32 id);
 
-int resize(__u32 size);
-
-__u32 max_data_size(struct inode *f);
-
-/* include blocks for indexes */
-__u32 inode_block_count(struct inode *f);
-
+int ino_cs(__u32 size, struct inode *ino);
 
 #endif

@@ -7,7 +7,7 @@
 void ialloc_init(struct super_block *sb);
 void ialloc_uninit(struct super_block *sb);
 
-int allocate_inode(__u32* fcb_id);
-int reclaim_inode(__u32 fcb_id);
+int allocate_inode(__u32* iid);
+int reclaim_inode(__u32 iid);
 
 #endif

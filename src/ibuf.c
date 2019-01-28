@@ -17,7 +17,7 @@ int ibuf_wtd(void *inode, __u32 id)
 
 int ibuf_init(struct super_block *sb)
 {
-        _tq = tq_init(sb->ibuf_bs, sb->ibuf_ml, sb->ibuf_ml, ibuf_rfd, ibuf_wtd);
+        _tq = tq_create(sb->ibuf_bs, sb->ibuf_ml, sb->ibuf_ml, ibuf_rfd, ibuf_wtd);
         if (!_tq)
                 return 0;
         return 1;
@@ -25,7 +25,7 @@ int ibuf_init(struct super_block *sb)
 
 void ibuf_uninit()
 {
-        tq_uninit(_tq);
+        tq_destroy(_tq);
 }
 
 int ibuf_read(void *inode, __u32 iid)

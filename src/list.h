@@ -67,15 +67,23 @@ struct list_node {
                 remove_head(con, ls, type, var); \
         } else { \
                 void *p = NULL; \
+                int is_find = 0; \
                 for_each(con, ls, type, var) { \
                         p = next_container(con, type, var); \
                         if (func((type *)p)) { \
+                                if (&((((type *)p)->var)) == ls->tail) { \
+                                        ls->tail = &(con->var); \
+                                } \
                                 con->var.next = con->var.next->next; \
                                 con = (type *)p; \
                                 con->var.next = NULL; \
                                 ls->size -= 1; \
+                                is_find = 1; \
                                 break; \
                         } \
+                } \
+                if (!is_find) {\
+                        con = NULL; \
                 } \
         }
 
