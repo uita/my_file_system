@@ -6,7 +6,7 @@
 
 struct file {
         __u32 ptr;
-        __u32 iid;
+        __u32 ino_id;
         struct inode *ino;
         void *block;
 };

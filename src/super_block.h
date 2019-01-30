@@ -14,6 +14,8 @@ struct super_block {
         __u32 block_size;      /* block size */
         __u32 max_inode_num;
         __u32 max_block_num;
+        __u32 spare_inode;
+        __u32 spare_block;
         __u32 iids[5];
         __u32 bids[128];
         __32  block_sp;

@@ -11,4 +11,6 @@ int build_bindex();
 int allocate_block(__u32* bid);
 int reclaim_block(__u32 bid);
 
+__u32 spare_block();
+
 #endif

@@ -8,11 +8,6 @@
 #include "string.h"
 #include "math.h"
 
-
-
-
-#include "rw.h"
-
 #define _bc (_block_size/4)
 #define _max_single _bc
 #define _max_double _bc*_bc
@@ -23,11 +18,13 @@
 #define _max_depth(i) (i < MAX_DIRECT_LEN ? 0 : i - MAX_DIRECT_LEN + 1)
 static __u32 _block_size;
 static __u32 _max_inode_num;
+static __u32 _max_block_num;
 
 int ino_init(struct super_block *sb)
 {
         _block_size = sb->block_size;
         _max_inode_num = sb->max_inode_num;
+        _max_block_num = sb->max_block_num;
 }
 
 void ino_uninit()
@@ -144,16 +141,51 @@ static int ino_add(__u32 id, int depth, int max_depth,
                         return 0;
                 }
         }
-        //if (!write_block(block, id))
-        //        re =0;
         if (!bbuf_write(block, id))
                 re = 0;
         free(block);
         return re;
 }
 
+static int ino_sub(__u32 id, int depth, int max_depth,
+                __u32 *leftover, int *is_done, struct inode *ino)
+{
+        int i;
+        if (depth > max_depth || *leftover == 0) {
+                *is_done = 1;
+                return 1;
+        }
+        __u32 *block = (__u32 *)malloc(_block_size);
+        if (!block)
+                return 0;
+        if (!bbuf_read(block, id)) {
+                free(block);
+                return 0;
+        }
+        for (i = _bc - 1; i >= 0; --i) {
+                if (*leftover == 0)
+                        break;
+                if (!ino_sub(block[i], depth+1, max_depth, leftover, is_done, ino)) {
+                        free(block);
+                        return 0;
+                }
+                if (*leftover != 0 || *is_done != 0) {
+                        reclaim_block(block[i]);
+                        if (depth == max_depth)
+                                *leftover -= 1;
+                        if (i == 0) {
+                                *is_done = 1;
+                        } else {
+                                *is_done = 0;
+                        }
+                }
+        }
+        free(block);
+        return 1;
+}
+
 // depth = 0
-static int ino_add_block(__u32 *block, __u32 *path, int len, int depth,
+static int ino_add_block(__u32 *block, __u32 *path, int len, int depth, __u32 *md,
                 __u32 *leftover, struct inode *ino)
 {
         __u32 i, end, *next_block = NULL;
@@ -161,7 +193,7 @@ static int ino_add_block(__u32 *block, __u32 *path, int len, int depth,
                 next_block = (__u32 *)malloc(_block_size);
                 if (!next_block ||
                                 !bbuf_read(next_block, block[path[depth]]) ||
-                                !ino_add_block(next_block, path, len, depth+1, leftover, ino)) {
+                                !ino_add_block(next_block, path, len, depth+1, md, leftover, ino)) {
                         goto failed;
                 }
         }
@@ -170,11 +202,14 @@ static int ino_add_block(__u32 *block, __u32 *path, int len, int depth,
                 if (*leftover == 0)
                         break;
                 allocate_block(block + i);
-                if (i < MAX_DIRECT_LEN) { // leaf
+                if (depth == 0) { //solve max depth
+                        *md = _max_depth(i);
+                }
+                if (depth == *md) { // leaf
                         *leftover -= 1;
                         ino->block_count += 1;
                 }
-                if (!ino_add(block[i], depth+1, _max_depth(i), leftover, ino))
+                if (!ino_add(block[i], depth+1, *md, leftover, ino))
                         goto failed;
         }
         if (next_block) {
@@ -189,8 +224,79 @@ failed:
         return 0;
 }
 
-static int ino_addb(int n, struct inode *ino)
+static void free_blocks_on_path(__u32 **blocks, int len) {
+        if (!blocks)
+                return;
+        int i;
+        for (i = 1; i < len; ++i) {
+                if (blocks[i])
+                        free(blocks[i]);
+        }
+        free(blocks);
+}
+
+static __u32 **ino_read_blocks_on_path(__u32 *path, int len, struct inode *ino)
 {
+        __u32 i, id;
+        __u32 **blocks = NULL;
+        blocks = (__u32 **)malloc(sizeof(__u32 *) * len);
+        if (!blocks)
+                return NULL;
+        blocks[0] = ino->index;
+        for (i = 1; i < len; ++i) {
+                id = blocks[i-1][path[i-1]];
+                blocks[i] = (__u32 *)malloc(_block_size);
+                if (!blocks[i] || !bbuf_read(blocks[i], id)) {
+                        free_blocks_on_path(blocks, len);
+                        return NULL;
+                }
+        }
+        return blocks;
+}
+
+//static int ino_sub(__u32 id, int depth, int max_depth,
+//                __u32 *leftover, int *is_done, struct inode *ino)
+static int ino_sub_block(__u32 *path, int len, __u32 *leftover, struct inode *ino)
+{
+        int i, j, md, is_done = 1;
+        __u32 **blocks = ino_read_blocks_on_path(path, len, ino);
+        if (!blocks)
+                return 0;
+        md = _max_depth(path[0]);
+        for (i = len - 1; i >= 0; --i) {
+                if (*leftover == 0 && is_done == 0)
+                        break;
+                for (j = path[i]; j >= 0; --j) {
+                        if (*leftover == 0 && is_done == 0)
+                                break;
+                        if (i == 0)
+                                md = _max_depth(j);
+                        if (j != path[i]) {
+                                if (!ino_sub(blocks[i][j], i + 1, md, leftover, &is_done, ino)) {
+                                        free_blocks_on_path(blocks, len);
+                                        return 0;
+                                }
+                        }
+                        if (is_done != 0) {
+                                reclaim_block(blocks[i][j]);
+                                if (i == md)  //leaf
+                                        *leftover -= 1;
+                                if (j == 0)
+                                        is_done = 1;
+                                else
+                                        is_done = 0;
+                        }
+                }
+        }
+        free_blocks_on_path(blocks, len);
+        return 1;
+}
+
+// n > 0
+static int ino_addb(__u32 n, struct inode *ino)
+{
+        if (n > spare_block() || ino->block_count + n > _max_inode_block_count)
+                return 0;
         if (ino->block_count == 0) {  // add first block
                 allocate_block(ino->index);
                 n--;
@@ -198,7 +304,20 @@ static int ino_addb(int n, struct inode *ino)
         }
         __u32 path[4];
         int len = get_path_fi(ino->block_count - 1, path, ino);
-        return ino_add_block(ino->index, path, len, 0, &n, ino);
+        __u32 md = _max_depth(path[0]); // init max depth
+        return ino_add_block(ino->index, path, len, 0, &md, &n, ino);
+}
+
+//static int ino_sub_block(__u32 *path, int len, __u32 *leftover, struct inode *ino)
+// n > 0
+static int ino_subb(__u32 n, struct inode *ino)
+{
+        if (n + spare_block() > _max_block_num || n > ino->block_count)
+                return 0;
+        __u32 path[4];
+        int len = get_path_fi(ino->block_count - 1, path, ino);
+        __u32 md = _max_depth(path[0]);
+        return ino_sub_block(path, len, &n, ino);
 }
 
 int ino_cs(__u32 size, struct inode *ino)
@@ -211,10 +330,10 @@ int ino_cs(__u32 size, struct inode *ino)
                 if (!ino_addb(newb - b, ino))
                         return 0;
         } else if (b > newb) {
-//                if (!ino_sub_block(b - newb, ino))
-//                        return 0;
+                if (!ino_subb(b - newb, ino))
+                        return 0;
         } else {
-                return 1;
+
         }
         ino->size = size;
         ino->block_count = newb;

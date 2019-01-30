@@ -59,7 +59,7 @@ static void print_tq(struct two_que *tq) {
         printf("\n");
 }
 
-static struct tq_node *get_node(__u32 id, struct two_que *tq)
+static struct tq_node *get_node(__u32 id, struct two_que *tq, int check_disk)
 {
         struct tq_node *node = NULL;
 #define id_equal(n) ((n == NULL ? 0 : ((struct tq_node*)n)->id == id))
@@ -68,7 +68,7 @@ static struct tq_node *get_node(__u32 id, struct two_que *tq)
                 add_rcount(node);
         } else {
                 node = alloc_node(id, tq->buf_size);
-                if (!tq->read_from_disk(node->buf, id)) {
+                if (check_disk != 0 && !tq->read_from_disk(node->buf, id)) {
                         free_node(node);
                         node = NULL;
                 }
@@ -93,9 +93,9 @@ static void add_node(struct tq_node *node, struct two_que *tq)
                 //print_tq(tq);
 }
 
-static struct tq_node *read_node(__u32 id, struct two_que *tq)
+static struct tq_node *read_node(__u32 id, struct two_que *tq, int check_disk)
 {
-        struct tq_node *node = get_node(id, tq);
+        struct tq_node *node = get_node(id, tq, check_disk);
         if (!node)
                 return NULL;
         add_node(node, tq);
@@ -142,7 +142,7 @@ int tq_read(void* data, __u32 id, struct two_que *tq)
 {
         if (!tq)
                 return 0;
-        struct tq_node *node = read_node(id, tq);
+        struct tq_node *node = read_node(id, tq, 1);
         if (!node)
                 return 0;
         memcpy(data, node->buf, tq->buf_size);
@@ -154,7 +154,7 @@ int tq_write(void* data, __u32 id, struct two_que *tq)
 {
         if (!tq)
                 return 0;
-        struct tq_node *node = read_node(id, tq);
+        struct tq_node *node = read_node(id, tq, 0);
         if (!node)
                 return 0;
         set_dirty(node);
@@ -166,14 +166,22 @@ int tq_write(void* data, __u32 id, struct two_que *tq)
  * Len = the number of 'offsets'
  * For indexes */
 
-static struct tq_node *parse_path(__u32 *path, int len, struct two_que *tq)
+static struct tq_node *parse_path(__u32 *path, int len, struct two_que *tq, int check_disk)
 {
         struct tq_node *node = NULL;
         int i;
-        node = read_node(path[0], tq);
+        if (len == 0) {
+                node = read_node(path[0], tq, check_disk);
+        } else {
+                node = read_node(path[0], tq, 1);
+        }
         if (node) {
                 for (i = 1; i <= len; ++i) {
-                        node = read_node(*(((__u32 *)(node->buf))+path[i]), tq);
+                        if (i != len) {
+                                node = read_node(*(((__u32 *)(node->buf))+path[i]), tq, 1);
+                        } else {
+                                node = read_node(*(((__u32 *)(node->buf))+path[i]), tq, check_disk);
+                        }
                         if (!node)
                                 break;
                 }
@@ -183,7 +191,7 @@ static struct tq_node *parse_path(__u32 *path, int len, struct two_que *tq)
 
 int tq_read_wp(void *data, __u32 *path, int len, struct two_que *tq)
 {
-        struct tq_node *node = parse_path(path, len, tq);
+        struct tq_node *node = parse_path(path, len, tq, 1);
         if (!node)
                 return 0;
         memcpy(data, node->buf, tq->buf_size);
@@ -192,7 +200,7 @@ int tq_read_wp(void *data, __u32 *path, int len, struct two_que *tq)
 
 int tq_write_wp(void *data, __u32 *path, int len, struct two_que *tq)
 {
-        struct tq_node *node = parse_path(path, len, tq);
+        struct tq_node *node = parse_path(path, len, tq, 0);
         if (!node)
                 return 0;
         memcpy(node->buf, data, tq->buf_size);

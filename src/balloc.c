@@ -11,6 +11,7 @@ static __u32 _first_block;
 static __u32 _max_block_num;
 static __u32 _block_size;
 static __u32 _max_stack_size;
+static __u32 _spare_block;
 
 int build_bindex()
 {
@@ -30,6 +31,7 @@ void balloc_init(struct super_block *sb)
 	_block_size = sb->block_size;
         _max_stack_size = _block_size / sizeof(__u32);
         _sp = sb->block_sp;
+        _spare_block = sb->spare_block;
         _bids = (__u32 *)malloc(_max_stack_size * _block_size);
         for (i = 0; i < _max_stack_size; ++i) {
                 _bids[i] = sb->bids[i];
@@ -42,6 +44,7 @@ void balloc_uninit(struct super_block *sb)
 	sb->max_block_num = _max_block_num;
 	sb->block_size = _block_size;
         sb->block_sp = _sp;
+        sb->spare_block = _spare_block;
         for (i = 0; i < _max_stack_size; ++i) {
                 sb->bids[i] = _bids[i];
         }
@@ -72,6 +75,8 @@ int allocate_block(__u32* bid)
 		_sp = _sp - 1;
 	}
 	*bid = bn;
+        _spare_block -= 1;
+        //printf("alloc block : %u\n", *bid);
 	return true;
 }
 
@@ -95,5 +100,12 @@ int reclaim_block(__u32 bid)
 		_sp = _sp + 1;
 	}
 	_bids[_sp] = bid;
+        _spare_block += 1;
+        //printf("recy : %u \n", bid);
 	return true;
+}
+
+__u32 spare_block()
+{
+        return _spare_block;
 }

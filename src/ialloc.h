@@ -10,4 +10,6 @@ void ialloc_uninit(struct super_block *sb);
 int allocate_inode(__u32* iid);
 int reclaim_inode(__u32 iid);
 
+__u32 spare_inode();
+
 #endif
