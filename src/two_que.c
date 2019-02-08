@@ -82,15 +82,11 @@ static void add_node(struct tq_node *node, struct two_que *tq)
         __u32 max_len = l == tq->ls1 ? tq->max_len1 : tq->max_len2;
         struct tq_node *head = NULL;
         if (list_size(l) >= max_len) {
-                //print_tq(tq);
                 remove_head(head, l, struct tq_node, var);
-                //print_tq(tq);
                 tq->write_to_disk(head->buf, head->id);
                 free_node(head);
         }
-                //print_tq(tq);
         add_tail(node, l, struct tq_node, var);
-                //print_tq(tq);
 }
 
 static struct tq_node *read_node(__u32 id, struct two_que *tq, int check_disk)

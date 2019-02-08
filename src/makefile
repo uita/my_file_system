@@ -1,7 +1,9 @@
-a.out:main.o ialloc.o balloc.o bbuf.o ibuf.o two_que.o rw.o disk.o inode.o
+a.out:main.o ialloc.o balloc.o bbuf.o ibuf.o two_que.o rw.o disk.o inode.o file.o
 	gcc *.o
-main.o:main.c ialloc.h balloc.h rw.h super_block.h inode.h ibuf.h bbuf.h
+main.o:main.c ialloc.h balloc.h rw.h super_block.h inode.h ibuf.h bbuf.h file.h
 	gcc -g -c main.c
+file.o:file.c file.h inode.h super_block.h list.h
+	gcc -g -c file.c
 inode.o:inode.c inode.h super_block.h balloc.h ialloc.h bbuf.h ibuf.h
 	gcc -g -c inode.c
 ialloc.o:ialloc.c super_block.h ialloc.h

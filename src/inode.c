@@ -7,6 +7,7 @@
 #include "stdlib.h"
 #include "string.h"
 #include "math.h"
+#include "time.h"
 
 #define _bc (_block_size/4)
 #define _max_single _bc
@@ -57,7 +58,7 @@ static int get_path(__u32 *path, __u32 n, struct inode *ino)
         return i - 1;
 }
 
-int ino_read(void *block, __u32 n, struct inode *ino)
+int ino_read_data(void *block, __u32 n, struct inode *ino)
 {
         if (n >= ino->block_count)
                 return 0;
@@ -72,7 +73,7 @@ int ino_read(void *block, __u32 n, struct inode *ino)
         }
 }
 
-int ino_write(void *block, __u32 n, struct inode *ino)
+int ino_write_data(void *block, __u32 n, struct inode *ino)
 {
         if (n >= ino->block_count)
                 return 0;
@@ -85,16 +86,6 @@ int ino_write(void *block, __u32 n, struct inode *ino)
                 free(path);
                 return 0;
         }
-}
-
-int ino_alloc(__u32 *id)
-{
-        return allocate_inode(id);
-}
-
-int ino_free(__u32 id)
-{
-        return reclaim_inode(id);
 }
 
 static int get_path_fi(int n, __u32 *path, struct inode *ino)
@@ -340,3 +331,82 @@ int ino_cs(__u32 size, struct inode *ino)
         return 1;
 }
 
+__u32 ino_alloc(struct inode *ino, __u32 parent, __u32 type)
+{
+        __u32 id;
+        ino = NULL;
+        if (allocate_inode(&id))
+                return 0;
+        ino = (struct inode *)malloc(sizeof(struct inode));
+        if (!ino) {
+                reclaim_inode(id);
+                return 0;
+        }
+        memset(ino, 0, sizeof(struct inode));
+        ino->parent = parent;
+        ino->type = type;
+        ino->ctime = time(NULL);
+        ibuf_write(ino, id);
+        return id;
+}
+
+int ino_recla(struct inode *ino, __u32 id)
+{
+        if (!ino) {
+                ino = (struct inode *)malloc(sizeof(struct inode));
+                if (!ino)
+                        return 0;
+                if (!ibuf_read(ino, id)) {
+                        free(ino);
+                        return 0;
+                }
+        }
+        ino_cs(0, ino);
+        reclaim_inode(id);
+        ino_free(ino);
+        return 1;
+}
+
+int ino_free(struct inode *ino)
+{
+        if (ino)
+                free(ino);
+}
+
+int ino_read(struct inode *ino, __u32 id)
+{
+        return ibuf_read(ino, id);
+}
+
+int ino_write(struct inode *ino, __u32 id)
+{
+        return ibuf_write(ino, id);
+}
+
+//int ino_set_type(int type, struct inode *ino)
+//{
+//        if (type < 0 || type > 1)
+//                return 0;
+//        ino->type = type;
+//        return 1;
+//}
+
+int ino_type(struct inode *ino)
+{
+        return ino->type;
+}
+
+//int ino_set_time(time_t t, struct inode *ino)
+//{
+//        ino->ctime = t;
+//}
+
+time_t ino_time(struct inode *ino)
+{
+        return ino->ctime;
+}
+
+__u32 ino_max_data_size()
+{
+        return _max_inode_size;
+}
