@@ -33,9 +33,9 @@ struct list_node {
         for (con = container(ls->head, type, var); con != NULL; \
                         con = next_container(con, type, var))
 
-#define get_head(ls, type, var) container(ls->head, type, var);
+#define get_head(ls, type, var) container(ls->head, type, var)
 
-#define get_tail(ls, type, var) container(ls->tail, type, var);
+#define get_tail(ls, type, var) container(ls->tail, type, var)
 
 #define add_tail(con, ls, type, var) \
         if (ls->size != 0) { \

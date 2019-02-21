@@ -95,6 +95,7 @@ int main() {
         char path2[256];
         char ins[10];
 
+        printf(">>");
         while (scanf("%s", ins)) {
                 memset(name, illegal_char, file_name_max_len);
                 if (is_equal(ins, "pwd", file_name_max_len))          {
@@ -119,6 +120,15 @@ int main() {
                 } else if (is_equal(ins, "rm", file_name_max_len))    {
                         scanf("%s", path1);
                         mfs_rm(path1);
+                } else if (is_equal(ins, "cat", file_name_max_len))   {
+                        scanf("%s", path1);
+                        mfs_cat(path1);
+                } else if (is_equal(ins, "input", file_name_max_len)) { 
+                        scanf("%s%s", path1, path2);
+                        mfs_input(path1, path2);
+                } else if (is_equal(ins, "output", file_name_max_len)) { 
+                        scanf("%s%s", path1, path2);
+                        mfs_output(path1, path2);
                 } else if (is_equal(ins, "open", file_name_max_len))  {
                 } else if (is_equal(ins, "close", file_name_max_len)) {
                 } else if (is_equal(ins, "read", file_name_max_len))  {
@@ -128,6 +138,7 @@ int main() {
                 } else {
                         printf("unknown instruction\n");
                 }
+                printf(">>");
         }
 
         /* uninit */
