@@ -23,6 +23,8 @@ struct super_block {
         __u32 ibuf_ml;
         __u32 bbuf_bs;
         __u32 bbuf_ml;
+        __u32 root_dir;
+        __u32 dir_max_degree;
 };
 
 #endif

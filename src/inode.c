@@ -331,14 +331,14 @@ int ino_cs(__u32 size, struct inode *ino)
         return 1;
 }
 
-__u32 ino_alloc(struct inode *ino, __u32 parent, __u32 type)
+__u32 ino_alloc(__u32 parent, __u32 type)
 {
         __u32 id;
-        ino = NULL;
-        if (allocate_inode(&id))
+        struct inode *ino = NULL;
+        if (allocate_inode(&id) == 0)
                 return 0;
         ino = (struct inode *)malloc(sizeof(struct inode));
-        if (!ino) {
+        if (!(ino)) {
                 reclaim_inode(id);
                 return 0;
         }
@@ -347,6 +347,7 @@ __u32 ino_alloc(struct inode *ino, __u32 parent, __u32 type)
         ino->type = type;
         ino->ctime = time(NULL);
         ibuf_write(ino, id);
+        free(ino);
         return id;
 }
 
@@ -360,10 +361,12 @@ int ino_recla(struct inode *ino, __u32 id)
                         free(ino);
                         return 0;
                 }
+                ino_cs(0, ino);
+                reclaim_inode(id);
+                ino_free(ino);
         }
         ino_cs(0, ino);
         reclaim_inode(id);
-        ino_free(ino);
         return 1;
 }
 

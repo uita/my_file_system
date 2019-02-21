@@ -27,6 +27,9 @@ void ialloc_init(struct super_block *sb)
 
 void ialloc_uninit(struct super_block *sb)
 {
+        int i;
+        for (i = 0; i < _bitmap_row; ++i)
+                sb->iids[i] = _iids[i];
 	free(_iids);
 	_iids = NULL;
 	_max_inode_num = 0;

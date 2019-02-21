@@ -10,8 +10,8 @@
 #define MAX_NAME_LEN 256
 #define MAX_DIRECT_LEN 10
 #define INDEX_SIZE 13
-#define FILE_TYPE 0
-#define DIR_TYPE 1
+#define _FILE_TYPE 0
+#define _DIR_TYPE 1
 
 struct inode {
         __u32 size;             // data size
@@ -30,7 +30,7 @@ int ino_write_data(void *block, __u32 n, struct inode *ino);
 
 int ino_cs(__u32 size, struct inode *ino);
 
-__u32 ino_alloc(struct inode *ino, __u32 parent, __u32 type);
+__u32 ino_alloc(__u32 parent, __u32 type);
 int ino_recla(struct inode *ino, __u32 id);
 int ino_free(struct inode *ino);
 

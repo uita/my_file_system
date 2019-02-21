@@ -1,3 +1,4 @@
+#include "mfs.h"
 #include "file.h"
 #include "ialloc.h"
 #include "balloc.h"
@@ -14,7 +15,7 @@
 #include "stdbool.h"
 #include "string.h"
 
-void test_init(struct super_block *sb) {
+void sb_init(struct super_block *sb) {
         memset(sb, 0, sizeof(struct super_block));
         sb->disk_capacity = 102400;
         sb->super_block_addr = 0;
@@ -34,10 +35,13 @@ void test_init(struct super_block *sb) {
         sb->ibuf_ml = 10;
         sb->bbuf_bs = sb->block_size;
         sb->bbuf_ml = 5;
+        sb->root_dir = 0;
+        sb->dir_max_degree = 100;
 }
 
-int is_equal(char *l1, char *l2, unsigned size) {
-        for (unsigned i = 0; i < size; ++i)
+int is_equal(char *l1, const char *l2, unsigned size) {
+        int i;
+        for (i = 0; i < size && l1[i] != '\0' && l2[i] != '\0'; ++i)
                 if (l1[i] != l2[i])
                         return 0;
         return 1;
@@ -55,17 +59,26 @@ void print(char *l1, char *l2, unsigned size) {
 int main() {
         /* install */
         struct super_block sb;
-        test_init(&sb);
+        sb_init(&sb);
         rw_init(&sb);
+        ibuf_init(&sb);
         bbuf_init(&sb);
+        ialloc_init(&sb);
         balloc_init(&sb);
+        ino_init(&sb);
         build_bindex();
+
+        sb.root_dir = ino_alloc(0xffffffff, DIR_TYPE);
+
+        ino_uninit();
         balloc_uninit(&sb);
+        ialloc_uninit(&sb);
         bbuf_uninit();
+        ibuf_uninit();
         rw_uninit(&sb);
         write_super_block(&sb);
 
-        /* run */
+        /* init */
         read_super_block(&sb);
         rw_init(&sb);
         bbuf_init(&sb);
@@ -74,31 +87,57 @@ int main() {
         ialloc_init(&sb);
         ino_init(&sb);
         f_init(&sb);
+        mfs_init(&sb);
 
-        /* test file */
-        char wbuf[588];
-        char rbuf[588];
-        int l = 588, e;
-        for (int i = 0; i < 588; ++i)
-                wbuf[i] = (char)(i%10+48);
-        __u32 iid = 0;
-        f_create(&iid, 0, 0);
-        struct file *f = NULL;
-        for (int t = 0; t < 10000; t++) {
-                l = rand() % 588;
-                f = f_open(iid);
-                e = f_cs(l, f);
-                e = f_write(wbuf, l, f);
-                e = f_sp(0, f);
-                e = f_read(rbuf, l, f);
-                f_close(f);
-                f = NULL;
-                if (!is_equal(wbuf, rbuf, l)) {
-                        printf("error %d\n", l);
-                        print(wbuf, rbuf, l);
+        /* run */
+        char name[file_name_max_len];
+        char path1[256];
+        char path2[256];
+        char ins[10];
+
+        while (scanf("%s", ins)) {
+                memset(name, illegal_char, file_name_max_len);
+                if (is_equal(ins, "pwd", file_name_max_len))          {
+                        mfs_pwd();
+                } else if (is_equal(ins, "ls", file_name_max_len))    {
+                        mfs_ls();
+                } else if (is_equal(ins, "cd", file_name_max_len))    {
+                        scanf("%s", path1);
+                        mfs_cd(path1);
+                } else if (is_equal(ins, "cp", file_name_max_len))    {
+                        scanf("%s%s", path1, path2);
+                        mfs_cp(path1, path2);
+                } else if (is_equal(ins, "mv", file_name_max_len))    {
+                        scanf("%s%s", path1, path2);
+                        mfs_mv(path1, path2);
+                } else if (is_equal(ins, "mkdir", file_name_max_len)) {
+                        scanf("%s", name);
+                        mfs_mkdir(name);
+                } else if (is_equal(ins, "touch", file_name_max_len)) {
+                        scanf("%s", name);
+                        mfs_touch(name);
+                } else if (is_equal(ins, "rm", file_name_max_len))    {
+                        scanf("%s", path1);
+                        mfs_rm(path1);
+                } else if (is_equal(ins, "open", file_name_max_len))  {
+                } else if (is_equal(ins, "close", file_name_max_len)) {
+                } else if (is_equal(ins, "read", file_name_max_len))  {
+                } else if (is_equal(ins, "write", file_name_max_len)) {
+                } else if (is_equal(ins, "esc", file_name_max_len)) {
                         break;
+                } else {
+                        printf("unknown instruction\n");
                 }
-                memset(rbuf, 0, 588);
         }
-        return 0;
+
+        /* uninit */
+        mfs_uninit(&sb);
+        f_uninit();
+        ino_uninit();
+        ialloc_uninit(&sb);
+        balloc_uninit(&sb);
+        ibuf_uninit();
+        bbuf_uninit();
+        rw_uninit(&sb);
+        write_super_block(&sb);
 }

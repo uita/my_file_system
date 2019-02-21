@@ -47,6 +47,15 @@ struct list_node {
         ls->tail->next = NULL; \
         ls->size += 1; \
 
+#define add_head(con, ls, type, var) \
+        if (ls->size != 0) { \
+                con->var.next = ls->head; \
+                ls->head = &(con->var); \
+        } else { \
+                ls->head = ls->tail = &(con->var); \
+        } \
+        ls->size += 1;
+
 #define remove_head(con, ls, type, var) \
         if (ls->size > 0) { \
                 con = container(ls->head, type, var); \
