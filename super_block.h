@@ -5,7 +5,7 @@
 
 struct super_block {
         /* needed for install */
-        __u32 disk_capacity;   /* bytes */ 
+        __u64 disk_capacity;   /* bytes */ 
 
         __u32 super_block_addr;
         __u32 inode_zone_addr;

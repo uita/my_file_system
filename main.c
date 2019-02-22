@@ -17,13 +17,14 @@
 
 void sb_init(struct super_block *sb) {
         memset(sb, 0, sizeof(struct super_block));
-        sb->disk_capacity = 102400;
+        //sb->disk_capacity = 15728508928;
+        sb->disk_capacity = 1073741824;
         sb->super_block_addr = 0;
         sb->inode_zone_addr = sizeof(struct super_block);
         sb->block_zone_addr = sb->inode_zone_addr + 10240;
         sb->inode_size = sizeof(struct inode);
-        //sb->block_size = 512;
-        sb->block_size = 12;
+        sb->block_size = 512;
+        //sb->block_size = 12;
         sb->max_inode_num = (sb->block_zone_addr - sb->inode_zone_addr) / sb->inode_size;
         sb->max_block_num = (sb->disk_capacity - sb->block_zone_addr) / sb->block_size;
         sb->spare_inode = sb->max_inode_num;
@@ -34,7 +35,7 @@ void sb_init(struct super_block *sb) {
         sb->ibuf_bs = sb->inode_size;
         sb->ibuf_ml = 10;
         sb->bbuf_bs = sb->block_size;
-        sb->bbuf_ml = 5;
+        sb->bbuf_ml = 20;
         sb->root_dir = 0;
         sb->dir_max_degree = 100;
 }
@@ -57,28 +58,33 @@ void print(char *l1, char *l2, unsigned size) {
 }
 
 int main() {
-        /* install */
+        char c;
+        scanf("%c", &c);
         struct super_block sb;
-        sb_init(&sb);
-        rw_init(&sb);
-        ibuf_init(&sb);
-        bbuf_init(&sb);
-        ialloc_init(&sb);
-        balloc_init(&sb);
-        ino_init(&sb);
-        build_bindex();
+        if (c == 'i') {
+                /* install */
+                sb_init(&sb);
+                rw_init(&sb);
+                ibuf_init(&sb);
+                bbuf_init(&sb);
+                ialloc_init(&sb);
+                balloc_init(&sb);
+                ino_init(&sb);
+                build_bindex();
 
-        sb.root_dir = ino_alloc(0xffffffff, DIR_TYPE);
+                sb.root_dir = ino_alloc(0xffffffff, DIR_TYPE);
 
-        ino_uninit();
-        balloc_uninit(&sb);
-        ialloc_uninit(&sb);
-        bbuf_uninit();
-        ibuf_uninit();
-        rw_uninit(&sb);
-        write_super_block(&sb);
-
+                ino_uninit();
+                balloc_uninit(&sb);
+                ialloc_uninit(&sb);
+                bbuf_uninit();
+                ibuf_uninit();
+                rw_uninit(&sb);
+                write_super_block(&sb);
+                return 0;
+        }
         /* init */
+        memset(&sb, 0, sizeof(sb));
         read_super_block(&sb);
         rw_init(&sb);
         bbuf_init(&sb);
@@ -108,9 +114,9 @@ int main() {
                 } else if (is_equal(ins, "cp", file_name_max_len))    {
                         scanf("%s%s", path1, path2);
                         mfs_cp(path1, path2);
-                } else if (is_equal(ins, "mv", file_name_max_len))    {
-                        scanf("%s%s", path1, path2);
-                        mfs_mv(path1, path2);
+                //} else if (is_equal(ins, "mv", file_name_max_len))    {
+                //        scanf("%s%s", path1, path2);
+                //        mfs_mv(path1, path2);
                 } else if (is_equal(ins, "mkdir", file_name_max_len)) {
                         scanf("%s", name);
                         mfs_mkdir(name);
@@ -129,10 +135,10 @@ int main() {
                 } else if (is_equal(ins, "output", file_name_max_len)) { 
                         scanf("%s%s", path1, path2);
                         mfs_output(path1, path2);
-                } else if (is_equal(ins, "open", file_name_max_len))  {
-                } else if (is_equal(ins, "close", file_name_max_len)) {
-                } else if (is_equal(ins, "read", file_name_max_len))  {
-                } else if (is_equal(ins, "write", file_name_max_len)) {
+                //} else if (is_equal(ins, "open", file_name_max_len))  {
+                //} else if (is_equal(ins, "close", file_name_max_len)) {
+                //} else if (is_equal(ins, "read", file_name_max_len))  {
+                //} else if (is_equal(ins, "write", file_name_max_len)) {
                 } else if (is_equal(ins, "esc", file_name_max_len)) {
                         break;
                 } else {

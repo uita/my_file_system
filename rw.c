@@ -1,7 +1,7 @@
 #include "disk.h"
 #include "super_block.h"
 
-static __u32 _disk_capacity;
+static __u64 _disk_capacity;
 static __u32 _super_block_addr;
 static __u32 _inode_zone_addr;
 static __u32 _block_zone_addr;

@@ -1,6 +1,0 @@
-mkdir home
-touch file
-mv file home/f
-cd home
-mkdir gg
-

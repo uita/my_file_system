@@ -18,6 +18,7 @@ int build_bindex()
 	__u32 i;
         _sp = -1;
 	for (i = 0; i < _max_block_num; ++i) {
+                printf("%d ", i);
                 if (!reclaim_block(i))
                         return false;
         }
